@@ -5,7 +5,7 @@ import "./openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "./openzeppelin-solidity/contracts/token/ERC20/SafeERC20.sol";
 
 contract Terminable is Ownable {
-    bool isTerminated = false;
+    bool public isTerminated = false;
     
     event Terminated();
     

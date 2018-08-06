@@ -1,26 +1,28 @@
 pragma solidity ^0.4.24;
 
-import "./MBACC.sol";
+import "./DaicoToken.sol";
+import "./openzeppelin-solidity/contracts/token/ERC20/DetailedERC20.sol";
+import "./openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
 
-contract MBA is StandardToken {
+contract MBA is StandardToken, DaicoToken, DetailedERC20 {
     using SafeERC20 for ERC20;
     using SafeMath for uint256;
-    
-    string public name = "MBA";
-	string public symbol = "MBA";
-	uint8 public decimals = 18;
 	
-	MBACC public ccToken;
 	mapping (address => bool) public hasTranferedFromMBACC;
 	
-	constructor(uint256 _totalSupply, MBACC _token) public {
+	ERC20 public ccToken;
+	uint256 public INITIAL_SUPPLY = 4000000000;
+	
+	constructor(ERC20 _token) 
+	    DetailedERC20("MBA", "MBA", 18)
+	    public
+	{
 	    require(_token != address(0));
 	    
-		totalSupply_ = _totalSupply * (10 ** uint256(decimals));
+		totalSupply_ = INITIAL_SUPPLY * (10 ** uint256(decimals));
 		require(totalSupply_ >= _token.totalSupply());
 		
 		ccToken = _token;
-		address(ccToken).delegatecall(bytes4(keccak256("terminate()")));
 		
 		if (_shouldTransferedFromMBACC(msg.sender)) {
 	        _transferFromMBACCToMBA(msg.sender);
