@@ -200,9 +200,12 @@ contract MBACrowdsale is FinalizableCrowdsale {
             vault.enableRefunds();
         }
         
-        // Burn all the unsold token.
+        // Burn half of the unsold token.
         BurnableToken burnableToken = BurnableToken(token);
-        burnableToken.burn(token.balanceOf(address(this)));
+        burnableToken.burn(token.balanceOf(address(this)).div(2));
+        
+        // Transfer the rest token to owner.
+        token.transfer(owner, token.balanceOf(address(this)));
         
         super.finalization();
     }
