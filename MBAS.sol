@@ -4,36 +4,17 @@ import "./openzeppelin-solidity/contracts/token/ERC20/StandardToken.sol";
 import "./openzeppelin-solidity/contracts/token/ERC20/SafeERC20.sol";
 import "./Terminable.sol";
 
-contract MBACC is StandardToken, Terminable {
+contract MBAS is StandardToken, Terminable {
 	using SafeERC20 for ERC20;
 	using SafeMath for uint256;
 	
-	string public name = "MBACC";
-	string public symbol = "MBA";
+	string public name = "MBAS";
+	string public symbol = "MBAS";
 	uint8 public decimals = 18;
-
-    mapping (address => bool) issued;
-    uint256 public eachIssuedAmount;
 	
-	constructor(uint256 _totalSupply, uint256 _eachIssuedAmount) public {
-	    require(_totalSupply >= _eachIssuedAmount);
-	    
+	constructor(uint256 _totalSupply) public {
 		totalSupply_ = _totalSupply * (10 ** uint256(decimals));
-		eachIssuedAmount = _eachIssuedAmount * (10 ** uint256(decimals));
-		
 		balances[msg.sender] = totalSupply_;
-		issued[msg.sender] = true;
-	}
-	
-	function issue() whenLive public {
-	    require(balances[owner] >= eachIssuedAmount);
-	    require(!issued[msg.sender]);
-	    
-	    balances[owner] = balances[owner].sub(eachIssuedAmount);
-	    balances[msg.sender] = balances[msg.sender].add(eachIssuedAmount);
-	    issued[msg.sender] = true;
-	    
-	    emit Transfer(owner, msg.sender, eachIssuedAmount);
 	}
 	
 	function transfer(address _to, uint256 _value) whenLive public returns (bool) {
