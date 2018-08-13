@@ -167,6 +167,16 @@ contract MBACrowdsale is FinalizableCrowdsale {
     }
     
     /**
+     * @dev Send tokens to buyers using BTC or LTC.
+     * @param _buyerWallet Buyer's wallet address.
+     * @param _amount Amount of token to transfer.
+     */
+    function sendTokenToBuyer(address _buyerWallet, uint256 _amount) onlyOwner public {
+        require(address(0) != _buyerWallet);
+        token.transfer(_buyerWallet, _amount);
+    }
+    
+    /**
      * @dev Validate the mininum contribution requirement.
      */
     function _preValidatePurchase(address _beneficiary, uint256 _weiAmount)
