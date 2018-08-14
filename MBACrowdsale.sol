@@ -63,11 +63,11 @@ contract MBACrowdsale is FinalizableCrowdsale {
         , address _fund
         , ERC20 _token) 
         Crowdsale(1, _fund, _token)
-        TimedCrowdsale(now, now + 5 minutes)
+        TimedCrowdsale(now, now + 100 days)
         public 
     {
-        bonusClosingTime0 = now + 2 minutes;
-        bonusClosingTime1 = now + 3 minutes;
+        bonusClosingTime0 = now + 10 days;
+        bonusClosingTime1 = now + 20 days;
         
         // Get the detailed erc20.
         DetailedERC20 erc20Token = DetailedERC20(token);
@@ -174,6 +174,7 @@ contract MBACrowdsale is FinalizableCrowdsale {
     function sendTokenToBuyer(address _buyerWallet, uint256 _amount) onlyOwner public {
         require(address(0) != _buyerWallet);
         token.transfer(_buyerWallet, _amount);
+        emit TokenPurchase(_buyerWallet, _buyerWallet, 0, _amount);
     }
     
     /**
