@@ -21,14 +21,6 @@ contract MBACrowdsale is FinalizableCrowdsale {
     uint256 public hardCapInToken;
     uint256 public soldToken = 0;
     
-    // Bouns stage time.
-    uint256 public bonusClosingTime0;
-    uint256 public bonusClosingTime1;
-    
-    // Bouns rate.
-    uint256 public bonusRateInPercent0 = 33;
-    uint256 public bonusRateInPercent1 = 20;
-    
     // Mininum contribute: 100 USD.
     uint256 public mininumContributeUSD = 100;
     
@@ -43,8 +35,13 @@ contract MBACrowdsale is FinalizableCrowdsale {
     uint256 public mininumContributeWei;
     
     // The exchange rate from USD to Token.
-    // 1 USD => 100 Token (0.01 USD => 1 Token).
-    uint256 public exchangeRateUSDToToken = 100;
+    // 1 USD => 100 Token (0.005 USD => 1 Token).
+    uint256 public exchangeRateUSDToToken = 200;
+    
+    // The bonus token thresold.
+    uint256 public tokenFor1000Usd = exchangeRateUSDToToken * 1000;
+    uint256 public tokenFor5000Usd = exchangeRateUSDToToken * 5000;
+    uint256 public tokenFor10000Usd = exchangeRateUSDToToken * 10000;
     
     // Refund vault used to hold funds while crowdsale is running
     RefundVault public vault;
@@ -55,20 +52,21 @@ contract MBACrowdsale is FinalizableCrowdsale {
     /**
      * @param _softCapInUSD Minimal funds to be collected.
      * @param _hardCapInUSD Maximal funds to be collected.
-     * @param _fund The Stray DAICO fund contract address.
-     * @param _token Stray ERC20 contract.
+     * @param _fund The Mamba DAICO fund contract address.
+     * @param _token Mamba ERC20 contract.
+     * @param _openingTime The opening time of crowdsale.
+     * @param _closingTime The closing time of crowdsale.
      */
     constructor(uint256 _softCapInUSD
         , uint256 _hardCapInUSD
         , address _fund
-        , ERC20 _token) 
+        , ERC20 _token
+        , uint256 _openingTime
+        , uint256 _closingTime)
         Crowdsale(1, _fund, _token)
-        TimedCrowdsale(now, now + 100 days)
+        TimedCrowdsale(_openingTime, _closingTime)
         public 
     {
-        bonusClosingTime0 = now + 10 days;
-        bonusClosingTime1 = now + 20 days;
-        
         // Get the detailed erc20.
         DetailedERC20 erc20Token = DetailedERC20(token);
         
@@ -85,10 +83,10 @@ contract MBACrowdsale is FinalizableCrowdsale {
         
         // Calculate mininum purchase token.
         mininumPurchaseTokenQuantity = exchangeRateUSDToToken * mininumContributeUSD 
-            * (10 ** (uint256(erc20Token.decimals())));
+           * (10 ** (uint256(erc20Token.decimals())));
         
-        // Set default exchange rate ETH => USD: 400.00
-        setExchangeRateETHToUSD(40000, 2);
+        // Set default exchange rate ETH => USD: 280.00
+        setExchangeRateETHToUSD(28000, 2);
     }
     
     /**
@@ -143,20 +141,6 @@ contract MBACrowdsale is FinalizableCrowdsale {
      */
     function softCapReached() public view returns (bool) {
         return soldToken >= softCapInToken;
-    }
-    
-    /**
-     * @dev Validate if it is in ICO stage 1.
-     */
-    function isInStage1() view public returns (bool) {
-        return now <= bonusClosingTime0 && now >= openingTime;
-    }
-    
-    /**
-     * @dev Validate if it is in ICO stage 2.
-     */
-    function isInStage2() view public returns (bool) {
-        return now <= bonusClosingTime1 && now > bonusClosingTime0;
     }
     
     /**
@@ -232,10 +216,16 @@ contract MBACrowdsale is FinalizableCrowdsale {
      * @dev Calculate the token amount and add bonus if needed.
      */
     function _addBonus(uint256 _tokenAmount) internal view returns (uint256) {
-        if (bonusClosingTime0 >= now) {
-            _tokenAmount = _tokenAmount.mul(100 + bonusRateInPercent0).div(100);
-        } else if (bonusClosingTime1 >= now) {
-            _tokenAmount = _tokenAmount.mul(100 + bonusRateInPercent1).div(100);
+        DetailedERC20 erc20Token = DetailedERC20(token);
+        uint256 tokenInteger = _tokenAmount.div(10 ** uint256(erc20Token.decimals()));
+        uint256 usd = tokenInteger.div(exchangeRateUSDToToken);
+        
+        if (usd >= tokenFor10000Usd) {
+            _tokenAmount = _tokenAmount.mul(2); // 100% bonus
+        } else if (usd >= tokenFor5000Usd) {
+            _tokenAmount = _tokenAmount.mul(3).div(2); // 50% bonus;
+        } else if (usd >= tokenFor1000Usd) {
+            _tokenAmount = _tokenAmount.mul(5).div(4); // 25% bonus;
         }
         
         require(_tokenAmount <= token.balanceOf(address(this)));
