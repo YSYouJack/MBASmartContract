@@ -258,7 +258,7 @@ contract MBAFund is Ownable {
         Ballot storage p = ballots[id];
         p.ballotType = BallotType.Tap;
 		p.openingTime = _startTime;
-		p.closingTime = p.openingTime + VOTING_DURATION;
+		p.closingTime = p.openingTime + VOTING_DURATION - 1;
 		p.isPassed = false;
 		p.isFinialized = false;
 		p.targetWei = _targetWei;
@@ -286,7 +286,7 @@ contract MBAFund is Ownable {
 		Ballot storage p = ballots[id];
 		p.ballotType = BallotType.Refund;
 		p.openingTime = _startTime;
-		p.closingTime = p.openingTime + VOTING_DURATION;
+		p.closingTime = p.openingTime + VOTING_DURATION - 1;
 		p.isPassed = false;
 		p.isFinialized = false;
 		
@@ -316,8 +316,6 @@ contract MBAFund is Ownable {
 		// Signal the event.
 		emit Voted(msg.sender, _supportsBallot);
 	}
-	
-	
 	
 	/**
 	 * @dev Withdraw the wei to team wallet.
@@ -439,7 +437,7 @@ contract MBAFund is Ownable {
 	    plan.budgetInWei = p.targetWei;
 	    plan.withdrawnWei = 0;
 	    
-	    if (now > budgetPlans[currentBudgetPlanId].endTime) {
+	    if (now > budgetPlans[currentBudgetPlanId].endTime && now <= budgetPlans[currentBudgetPlanId].startTime) {
 	        plan.startTime = now;
 	        plan.endTime = _budgetEndTime(now);
 	        ++currentBudgetPlanId;
@@ -453,6 +451,8 @@ contract MBAFund is Ownable {
 	    internal
 	    returns (uint256)
 	{
+	    //return ((_startTime / 5 minutes) + 1) * 5 minutes - 1;
+	    
 	    // Decompose to datetime.
         uint32 year;
         uint8 month;
@@ -484,6 +484,9 @@ contract MBAFund is Ownable {
         internal 
         returns (uint256, uint256)
     {
+        //uint256 startTime = _budgetEndTime(now) + 1;
+        //return (startTime, startTime + 5 minutes - 1);
+        
         // Decompose to datetime.
         uint32 year;
         uint8 month;

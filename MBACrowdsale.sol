@@ -1,7 +1,8 @@
 pragma solidity ^0.4.24;
 
-import "./openzeppelin-solidity/contracts/crowdsale/distribution/FinalizableCrowdsale.sol";
+import "./openzeppelin-solidity/contracts/crowdsale/validation/TimedCrowdsale.sol";
 import "./openzeppelin-solidity/contracts/crowdsale/distribution/utils/RefundVault.sol";
+import "./openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "./openzeppelin-solidity/contracts/token/ERC20/DetailedERC20.sol";
 import "./openzeppelin-solidity/contracts/token/ERC20/BurnableToken.sol";
 
@@ -13,7 +14,7 @@ import "./openzeppelin-solidity/contracts/token/ERC20/BurnableToken.sol";
  * We use a fixed exchange rate from USD to Token, so the exchange rate between
  * ETH and Token is floating. 
  */
-contract MBACrowdsale is FinalizableCrowdsale {
+contract MBACrowdsale is TimedCrowdsale, Ownable {
     using SafeMath for uint256;
     
     // Soft cap and hard cap in distributed token.
@@ -39,15 +40,25 @@ contract MBACrowdsale is FinalizableCrowdsale {
     uint256 public exchangeRateUSDToToken = 200;
     
     // The bonus token thresold.
-    uint256 public tokenFor1000Usd = exchangeRateUSDToToken * 1000;
-    uint256 public tokenFor5000Usd = exchangeRateUSDToToken * 5000;
-    uint256 public tokenFor10000Usd = exchangeRateUSDToToken * 10000;
+    uint256 public tokenFor1000Usd;
+    uint256 public tokenFor5000Usd;
+    uint256 public tokenFor10000Usd;
     
     // Refund vault used to hold funds while crowdsale is running
     RefundVault public vault;
     
+    // Check if the crowdsale is finalized.
+    bool public isFinalized = false;
+    
     // Event 
+    event Finalized();
     event RateUpdated(uint256 rate, uint256 mininumContributeWei);
+    
+    // Modifier
+    modifier onlyNotFinailized() {
+        require(!isFinalized);
+        _;
+    }
     
     /**
      * @param _softCapInUSD Minimal funds to be collected.
@@ -77,6 +88,11 @@ contract MBACrowdsale is FinalizableCrowdsale {
         hardCapInToken = _hardCapInUSD * exchangeRateUSDToToken * (10 ** uint256(erc20Token.decimals()));
         
         require(erc20Token.balanceOf(owner) >= hardCapInToken);
+        
+        // Set bouns thresold.
+        tokenFor1000Usd = 1000 * exchangeRateUSDToToken * (10 ** uint256(erc20Token.decimals()));
+        tokenFor5000Usd = tokenFor1000Usd.mul(5);
+        tokenFor10000Usd = tokenFor5000Usd.mul(2);
         
         // Create the refund vault.
         vault = new RefundVault(_fund);
@@ -155,10 +171,58 @@ contract MBACrowdsale is FinalizableCrowdsale {
      * @param _buyerWallet Buyer's wallet address.
      * @param _amount Amount of token to transfer.
      */
-    function sendTokenToBuyer(address _buyerWallet, uint256 _amount) onlyOwner public {
+    function sendTokenToBuyer(address _buyerWallet, uint256 _amount) 
+        public 
+        onlyOwner
+        onlyWhileOpen
+        onlyNotFinailized
+    {
         require(address(0) != _buyerWallet);
+        require(address(this) != _buyerWallet);
+        require(owner != _buyerWallet);
+        
+        // Add soldtoken to calculate sold token amount.
+        soldToken = soldToken.add(_amount);
+        require(soldToken <= hardCapInToken);
+        
+        // Calculate the bonus.
+        _amount = _addBonus(_amount);
+        
+        // Transfer the token.
         token.transfer(_buyerWallet, _amount);
+        
+        // Emit the event.
         emit TokenPurchase(_buyerWallet, _buyerWallet, 0, _amount);
+    }
+    
+    /**
+     * @dev Must be called after crowdsale ends, to do some extra finalization
+     * work. Calls the contract's finalization function.
+     */
+    function finalize() onlyOwner public {
+        require(!isFinalized);
+        require(hasClosed() || token.balanceOf(address(this)) == 0 || soldToken == hardCapInToken);
+        
+        // Check if the crowdsale is successed.
+        if (softCapReached()) {
+            // Burn half of the unsold token.
+            BurnableToken burnableToken = BurnableToken(token);
+            burnableToken.burn(token.balanceOf(address(this)).div(2));
+            
+            // Transfer the rest token to owner.
+            token.transfer(owner, token.balanceOf(address(this)));
+            
+            // Close the fund vault.   
+            vault.close();
+        } else {
+            vault.enableRefunds();
+        }
+        
+        // Emit the event.
+        emit Finalized();
+
+        // Change the state.
+        isFinalized = true;
     }
     
     /**
@@ -166,6 +230,7 @@ contract MBACrowdsale is FinalizableCrowdsale {
      */
     function _preValidatePurchase(address _beneficiary, uint256 _weiAmount)
         internal
+        onlyNotFinailized
     {
         super._preValidatePurchase(_beneficiary, _weiAmount);
         require(_weiAmount >= mininumContributeWei);
@@ -184,26 +249,6 @@ contract MBACrowdsale is FinalizableCrowdsale {
         
         super._processPurchase(_beneficiary, _tokenAmount);
     }
-    
-    /**
-     * @dev Finalization task, called when owner calls finalize()
-     */
-    function finalization() internal {
-        if (softCapReached()) {
-            vault.close();
-        } else {
-            vault.enableRefunds();
-        }
-        
-        // Burn half of the unsold token.
-        BurnableToken burnableToken = BurnableToken(token);
-        burnableToken.burn(token.balanceOf(address(this)).div(2));
-        
-        // Transfer the rest token to owner.
-        token.transfer(owner, token.balanceOf(address(this)));
-        
-        super.finalization();
-    }
 
     /**
      * @dev Overrides Crowdsale fund forwarding, sending funds to vault.
@@ -216,15 +261,12 @@ contract MBACrowdsale is FinalizableCrowdsale {
      * @dev Calculate the token amount and add bonus if needed.
      */
     function _addBonus(uint256 _tokenAmount) internal view returns (uint256) {
-        DetailedERC20 erc20Token = DetailedERC20(token);
-        uint256 tokenInteger = _tokenAmount.div(10 ** uint256(erc20Token.decimals()));
-        uint256 usd = tokenInteger.div(exchangeRateUSDToToken);
         
-        if (usd >= tokenFor10000Usd) {
+        if (_tokenAmount >= tokenFor10000Usd) {
             _tokenAmount = _tokenAmount.mul(2); // 100% bonus
-        } else if (usd >= tokenFor5000Usd) {
+        } else if (_tokenAmount >= tokenFor5000Usd) {
             _tokenAmount = _tokenAmount.mul(3).div(2); // 50% bonus;
-        } else if (usd >= tokenFor1000Usd) {
+        } else if (_tokenAmount >= tokenFor1000Usd) {
             _tokenAmount = _tokenAmount.mul(5).div(4); // 25% bonus;
         }
         
