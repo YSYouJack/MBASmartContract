@@ -236,25 +236,25 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
         require(_weiAmount >= mininumContributeWei);
     }
     
-    /**
-     * @dev Executed when a purchase has been validated and is ready to be executed. Not necessarily emits/sends tokens.
-     * @param _beneficiary Address receiving the tokens
-     * @param _tokenAmount Number of tokens to be purchased
-     */
-    function _processPurchase(address _beneficiary, uint256 _tokenAmount) internal {
-        soldToken = soldToken.add(_tokenAmount);
-        require(soldToken <= hardCapInToken);
-        
-       _tokenAmount = _addBonus(_tokenAmount);
-        
-        super._processPurchase(_beneficiary, _tokenAmount);
-    }
 
     /**
      * @dev Overrides Crowdsale fund forwarding, sending funds to vault.
      */
     function _forwardFunds() internal {
         vault.deposit.value(msg.value)(msg.sender);
+    }
+    
+    /**
+     * @dev Override to add bonus and calculate the sold token amount.
+     */
+    function _getTokenAmount(uint256 _weiAmount) internal view returns (uint256)
+    {
+        uint256 tokens = super._getTokenAmount(_weiAmount);
+        
+        soldToken = soldToken.add(tokens);
+        require(soldToken <= hardCapInToken);
+        
+        return _addBonus(tokens);
     }
     
     /**
