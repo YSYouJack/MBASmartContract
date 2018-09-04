@@ -24,10 +24,6 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
     
     // Mininum contribute: 100 USD.
     uint256 public mininumContributeUSD = 100;
-    
-    // The floating exchange rate from external API.
-    uint256 public decimalsETHToUSD;
-    uint256 public exchangeRateETHToUSD;
    
    // The mininum purchase token quantity.
     uint256 public mininumPurchaseTokenQuantity;
@@ -52,7 +48,6 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
     
     // Event 
     event Finalized();
-    event RateUpdated(uint256 rate, uint256 mininumContributeWei);
     
     // Modifier
     modifier onlyNotFinailized() {
@@ -100,45 +95,29 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
         // Calculate mininum purchase token.
         mininumPurchaseTokenQuantity = exchangeRateUSDToToken * mininumContributeUSD 
            * (10 ** (uint256(erc20Token.decimals())));
+           
+        // Default rate 1 ether => 250 usd.
+        uint256 _rate = 250 * exchangeRateUSDToToken * (10 ** (uint256(erc20Token.decimals()) - 18));
+        uint256 minWei = mininumPurchaseTokenQuantity.div(_rate);
+        if (minWei.mul(_rate) < mininumPurchaseTokenQuantity) {
+            minWei += 1;
+        }
         
-        // Set default exchange rate ETH => USD: 280.00
-        setExchangeRateETHToUSD(28000, 2);
+        setRate(_rate, minWei);
     }
     
     /**
-     * @dev Set the exchange rate from ETH to USD.
+     * @dev Set the exchange rate from wei to token.
      * @param _rate The exchange rate.
-     * @param _decimals The decimals of input rate.
+     * @param _minWei The mininum contribution wei.
      */
-    function setExchangeRateETHToUSD(uint256 _rate, uint256 _decimals) onlyOwner public {
-        // wei * 1e-18 * _rate * 1e(-_decimals) * 1e2          = amount * 1e(-token.decimals);
-        // -----------   ----------------------   -------------
-        // Wei => ETH      ETH => USD             USD => Token
-        //
-        // If _rate = 1, wei = 1,
-        // Then  amount = 1e(token.decimals + 2 - 18 - _decimals).
-        // We need amount >= 1 to ensure the precision.
+    function setRate(uint256 _rate, uint256 _minWei) onlyOwner public {
+        require(_minWei >= 1);
+        require(_rate.mul(_minWei) >= mininumPurchaseTokenQuantity);
+        require(_rate.mul(_minWei - 1) < mininumPurchaseTokenQuantity);
         
-        DetailedERC20 erc20Token = DetailedERC20(token);
-        
-        require(uint256(erc20Token.decimals()).add(2) >= _decimals.add(18));
-        
-        exchangeRateETHToUSD = _rate;
-        decimalsETHToUSD = _decimals;
-        rate = _rate.mul(exchangeRateUSDToToken);
-        if (uint256(erc20Token.decimals()) >= _decimals.add(18)) {
-            rate = rate.mul(10 ** (uint256(erc20Token.decimals()).sub(18).sub(_decimals)));
-        } else {
-            rate = rate.div(10 ** (_decimals.add(18).sub(uint256(erc20Token.decimals()))));
-        }
-        
-        mininumContributeWei = mininumPurchaseTokenQuantity.div(rate); 
-        
-        // Avoid rounding error.
-        if (mininumContributeWei * rate < mininumPurchaseTokenQuantity)
-            mininumContributeWei += 1;
-            
-        emit RateUpdated(rate, mininumContributeWei);
+        mininumContributeWei = _minWei;
+		rate = _rate;
     }
     
     /**
