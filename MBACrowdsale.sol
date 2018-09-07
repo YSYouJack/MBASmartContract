@@ -1,10 +1,10 @@
 pragma solidity ^0.4.24;
 
 import "./openzeppelin-solidity/contracts/crowdsale/validation/TimedCrowdsale.sol";
-import "./openzeppelin-solidity/contracts/crowdsale/distribution/utils/RefundVault.sol";
 import "./openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "./openzeppelin-solidity/contracts/token/ERC20/DetailedERC20.sol";
 import "./openzeppelin-solidity/contracts/token/ERC20/BurnableToken.sol";
+import "./MBARefundVault.sol";
 
 /**
  * @title MBACrowdsale
@@ -41,7 +41,7 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
     uint256 public tokenFor10000Usd;
     
     // Refund vault used to hold funds while crowdsale is running
-    RefundVault public vault;
+    MBARefundVault public vault;
     
     // Check if the crowdsale is finalized.
     bool public isFinalized = false;
@@ -90,7 +90,7 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
         tokenFor10000Usd = tokenFor5000Usd.mul(2);
         
         // Create the refund vault.
-        vault = new RefundVault(_fund);
+        vault = new MBARefundVault(_fund);
         
         // Calculate mininum purchase token.
         mininumPurchaseTokenQuantity = exchangeRateUSDToToken * mininumContributeUSD 
@@ -121,13 +121,22 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
     }
     
     /**
-     * @dev Investors can claim refunds here if crowdsale is unsuccessful
+     * @dev Refund to the investors.
+     * @param _startId Start id of investors.
+     * @param _endId End id of investors.
      */
-    function claimRefund() public {
+    function refund(uint256 _startId, uint256 _endId) onlyOwner public {
         require(isFinalized);
         require(!softCapReached());
 
-        vault.refund(msg.sender);
+        vault.refund(_startId, _endId);
+    }
+    
+    /**
+     * @dev Get investor count.
+     */
+    function investorsCount() public view returns (uint256) {
+        return vault.investorsCount();
     }
     
     /**
