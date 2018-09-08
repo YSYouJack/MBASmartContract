@@ -76,29 +76,26 @@ contract MBARefundVault is Ownable {
     }
 
     /**
-     * @param startId Start id of investor id.
-     * @param endId End id of investor id.
+     * @param _investor The investor addres.
      */
-    function refund(uint256 startId, uint256 endId) onlyOwner public {
+    function refund(address _investor) onlyOwner public {
         require(state == State.Refunding);
-        require(startId <= endId && endId < investors.length);
+        require(isInvested[_investor]);
         
-        for (uint256 id = startId; id <= endId; ++id) {
-            Investor storage p = investors[id];
-            if (!p.isRefunded) {
-                p.isRefunded = true;
-                
-                uint256 txFee = p.deposited.div(200); // 0.5% tx fee.
-                if (0 != txFee) {
-                    wallet.transfer(txFee);
-                }
-                
-                uint256 refundValue = p.deposited - txFee;
-                if (0 != refundValue) {
-                    p.wallet.transfer(refundValue);
-                    emit Refunded(p.wallet, refundValue);
-                }
-            }
+        Investor storage p = investors[investorMap[_investor]];
+        require(!p.isRefunded);
+        
+        p.isRefunded = true;
+        
+        uint256 txFee = p.deposited.div(200); // 0.5% tx fee.
+        if (0 != txFee) {
+            wallet.transfer(txFee);
+        }
+        
+        uint256 refundValue = p.deposited - txFee;
+        if (0 != refundValue) {
+            p.wallet.transfer(refundValue);
+            emit Refunded(p.wallet, refundValue);
         }
     }
     

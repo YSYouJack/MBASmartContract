@@ -122,14 +122,13 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
     
     /**
      * @dev Refund to the investors.
-     * @param _startId Start id of investors.
-     * @param _endId End id of investors.
+     * @param _investor Investor address.
      */
-    function refund(uint256 _startId, uint256 _endId) onlyOwner public {
+    function refund(address _investor) onlyOwner public {
         require(isFinalized);
         require(!softCapReached());
 
-        vault.refund(_startId, _endId);
+        vault.refund(_investor);
     }
     
     /**
