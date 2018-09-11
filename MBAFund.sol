@@ -89,11 +89,9 @@ contract MBAFund is Ownable {
 	
 	// The voting duration.
 	uint256 public VOTING_DURATION = 1 weeks;
-	//uint256 public VOTING_DURATION = 2 minutes;
 	
 	// Refund lock duration.
 	uint256 public REFUND_LOCK_DURATION = 30 days;
-	//uint256 public REFUND_LOCK_DURATION = 2 minutes;
 	
 	// Refund lock date.
 	uint256 public refundLockDate = 0;
@@ -172,7 +170,7 @@ contract MBAFund is Ownable {
 	        return false;
 	    } else {
 	        Ballot storage p = ballots[ballots.length - 1];
-	        return now <= p.closingTime;
+	        return now >= p.openingTime && now <= p.closingTime;
 	    }
 	}
 	
@@ -451,8 +449,6 @@ contract MBAFund is Ownable {
 	    internal
 	    returns (uint256)
 	{
-	    //return ((_startTime / 5 minutes) + 1) * 5 minutes - 1;
-	    
 	    // Decompose to datetime.
         uint32 year;
         uint8 month;
@@ -484,9 +480,6 @@ contract MBAFund is Ownable {
         internal 
         returns (uint256, uint256)
     {
-        //uint256 startTime = _budgetEndTime(now) + 1;
-        //return (startTime, startTime + 5 minutes - 1);
-        
         // Decompose to datetime.
         uint32 year;
         uint8 month;
