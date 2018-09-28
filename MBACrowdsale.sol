@@ -38,7 +38,7 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
     // The bonus token thresold.
     uint256 public tokenFor1000Usd;
     uint256 public tokenFor5000Usd;
-    uint256 public tokenFor10000Usd;
+    uint256 public tokenFor20000Usd;
     
     // Refund vault used to hold funds while crowdsale is running
     MBARefundVault public vault;
@@ -87,7 +87,7 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
         // Set bouns thresold.
         tokenFor1000Usd = 1000 * exchangeRateUSDToToken * (10 ** uint256(erc20Token.decimals()));
         tokenFor5000Usd = tokenFor1000Usd.mul(5);
-        tokenFor10000Usd = tokenFor5000Usd.mul(2);
+        tokenFor20000Usd = tokenFor5000Usd.mul(4);
         
         // Create the refund vault.
         vault = new MBARefundVault(_fund);
@@ -249,12 +249,12 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
      */
     function _addBonus(uint256 _tokenAmount) internal view returns (uint256) {
         
-        if (_tokenAmount >= tokenFor10000Usd) {
-            _tokenAmount = _tokenAmount.mul(2); // 100% bonus
-        } else if (_tokenAmount >= tokenFor5000Usd) {
+        if (_tokenAmount >= tokenFor20000Usd) {
             _tokenAmount = _tokenAmount.mul(3).div(2); // 50% bonus;
-        } else if (_tokenAmount >= tokenFor1000Usd) {
+        } else if (_tokenAmount >= tokenFor5000Usd) {
             _tokenAmount = _tokenAmount.mul(5).div(4); // 25% bonus;
+        } else if (_tokenAmount >= tokenFor1000Usd) {
+            _tokenAmount = _tokenAmount.mul(11).div(10); // 10% bonus;
         }
         
         require(_tokenAmount <= token.balanceOf(address(this)));
