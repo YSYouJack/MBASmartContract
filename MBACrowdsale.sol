@@ -46,6 +46,9 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
     // Check if the crowdsale is finalized.
     bool public isFinalized = false;
     
+    // Records on the token transferred by purchasing of other currencies.
+    mapping (bytes32 => bool) isTokenTransfered;
+    
     // Event 
     event Finalized();
     
@@ -154,11 +157,23 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
     }
     
     /**
-     * @dev Send tokens to buyers using BTC or LTC.
+     * @dev Validate if the token has been transfered for given tx of other paid currencies.
+     * @param _txHash Paid tx hash on paid chain.
+     */
+    function isTokenTransferedForTx(string _txHash) view public returns (bool) {
+        return isTokenTransfered[keccak256(abi.encodePacked(_txHash))];
+    }
+    
+    /**
+     * @dev Send tokens to buyers using BTC, LTC, BCC, or ETC.
+     * @param _paidTxHash Purchased tx hash on paid currency chain.
      * @param _buyerWallet Buyer's wallet address.
      * @param _amount Amount of token to transfer.
      */
-    function sendTokenToBuyer(address _buyerWallet, uint256 _amount) 
+    function sendTokenToBuyer(string _paidTxHash
+        , address _buyerWallet
+        , uint256 _amount
+    ) 
         public 
         onlyOwner
         onlyWhileOpen
@@ -167,6 +182,9 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
         require(address(0) != _buyerWallet);
         require(address(this) != _buyerWallet);
         require(owner != _buyerWallet);
+     
+        bytes32 key = keccak256(abi.encodePacked(_paidTxHash));
+        require(!isTokenTransfered[key]);
         
         // Add soldtoken to calculate sold token amount.
         soldToken = soldToken.add(_amount);
@@ -176,11 +194,41 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
         _amount = _addBonus(_amount);
         
         // Transfer the token.
+        isTokenTransfered[key] = true;
         token.transfer(_buyerWallet, _amount);
         
         // Emit the event.
         emit TokenPurchase(_buyerWallet, _buyerWallet, 0, _amount);
     }
+    
+    /**
+     * @dev low level token purchase ***DO NOT OVERRIDE***
+     * @param _beneficiary Address performing the token purchase
+     */
+    function buyTokens(address _beneficiary) public payable {
+        uint256 weiAmount = msg.value;
+        _preValidatePurchase(_beneficiary, weiAmount);
+
+        // calculate token amount to be created
+        uint256 tokens = _getTokenAmount(weiAmount);
+        
+        soldToken = soldToken.add(tokens);
+        require(soldToken <= hardCapInToken);
+        
+        tokens = _addBonus(tokens);
+        
+        // update state
+        weiRaised = weiRaised.add(weiAmount);
+
+        _processPurchase(_beneficiary, tokens);
+        
+        emit TokenPurchase(msg.sender, _beneficiary, weiAmount, tokens);
+
+        _updatePurchasingState(_beneficiary, weiAmount);
+
+        _forwardFunds();
+        _postValidatePurchase(_beneficiary, weiAmount);
+  }
     
     /**
      * @dev Must be called after crowdsale ends, to do some extra finalization
@@ -229,19 +277,6 @@ contract MBACrowdsale is TimedCrowdsale, Ownable {
      */
     function _forwardFunds() internal {
         vault.deposit.value(msg.value)(msg.sender);
-    }
-    
-    /**
-     * @dev Override to add bonus and calculate the sold token amount.
-     */
-    function _getTokenAmount(uint256 _weiAmount) internal view returns (uint256)
-    {
-        uint256 tokens = super._getTokenAmount(_weiAmount);
-        
-        soldToken = soldToken.add(tokens);
-        require(soldToken <= hardCapInToken);
-        
-        return _addBonus(tokens);
     }
     
     /**
